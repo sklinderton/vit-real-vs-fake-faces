@@ -1,0 +1,9 @@
+{
+  "epochs_completed": 15,
+  "best_val_auc": 0.9519655,
+  "total_time_minutes": 10.75,
+  "device": "cuda",
+  "gpu_name": "NVIDIA L40S",
+  "batch_size": 32,
+  "learning_rate": 0.0001
+}
