@@ -1,25 +1,33 @@
-
+# ── Datos (demasiado grandes para Git, ver README para regenerarlos) ────────
 data/raw/
-
 data/processed/
-
-*.npy
-
+data/uploads/*.jpg
+data/uploads/*.png
+data/uploads/*.jpeg
 *.zip
 
+# ── Checkpoints del modelo (>100MB, excede el límite de GitHub) ────────────
+# ViT-B/16: 85.8M params x 4 bytes (modelo) + estado AdamW (2x momentos)
+# ≈ 1GB+ por archivo .pt — no se versiona, se regenera con train_vit.py
+checkpoints/*.pt
+checkpoints/*.pth
+
+# ── Entornos virtuales ───────────────────────────────────────────────────────
+envs/
+venv/
+.venv/
+
+# ── Python ─────────────────────────────────────────────────────────────────
 __pycache__/
-
 *.pyc
-
+*.egg-info/
 .ipynb_checkpoints/
 
-*.pth
+# ── Cachés de modelos preentrenados ──────────────────────────────────────────
+.cache/torch/
+.cache/huggingface/
+.cache/pip/
 
-*.pt
-
-*.pkl
-
-envs/
-
-venv/
-
+# ── Sistema ───────────────────────────────────────────────────────────────
+.DS_Store
+*.swp

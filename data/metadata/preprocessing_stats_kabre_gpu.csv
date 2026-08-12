@@ -1,0 +1,4 @@
+split,n_total,n_saved,n_errors,time_s,throughput,n_chunks
+train,16000,16000,0,6.79,2358.12,8
+val,2000,2000,0,1.29,1550.28,1
+test,2000,2000,0,1.39,1434.73,1

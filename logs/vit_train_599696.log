@@ -126,3 +126,11 @@ Mejor AUC-ROC en validación: 0.9520
 ==============================================
   Job finalizado — Tue Aug 11 05:56:32 PM CST 2026
 ==============================================
+[master 70e323a] results: entrenamiento ViT job 599696 - 2026-08-11
+ 5 files changed, 546 insertions(+)
+ create mode 100644 logs/vit_train_599696.err
+ create mode 100644 logs/vit_train_599696.log
+ create mode 100644 results/gpu_stats.csv
+ create mode 100644 results/training_log.csv
+ create mode 100644 results/training_summary.json
+[OK] Commit realizado
