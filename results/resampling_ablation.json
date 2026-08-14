@@ -1,0 +1,57 @@
+{
+  "n_images": 200,
+  "seed_range": [
+    100000,
+    100199
+  ],
+  "truncation_psi": 1.0,
+  "results_by_method": [
+    {
+      "method": "lanczos",
+      "detection_rate": 0.205,
+      "mean_p_fake": 0.2217,
+      "std_p_fake": 0.3389,
+      "mean_high_freq": 6.8056
+    },
+    {
+      "method": "bicubic",
+      "detection_rate": 0.195,
+      "mean_p_fake": 0.2163,
+      "std_p_fake": 0.3365,
+      "mean_high_freq": 6.6774
+    },
+    {
+      "method": "bilinear",
+      "detection_rate": 0.185,
+      "mean_p_fake": 0.2047,
+      "std_p_fake": 0.3309,
+      "mean_high_freq": 6.3812
+    },
+    {
+      "method": "area",
+      "detection_rate": 0.185,
+      "mean_p_fake": 0.2124,
+      "std_p_fake": 0.3349,
+      "mean_high_freq": 6.8068
+    },
+    {
+      "method": "nearest",
+      "detection_rate": 0.19,
+      "mean_p_fake": 0.2078,
+      "std_p_fake": 0.3322,
+      "mean_high_freq": 7.3153
+    },
+    {
+      "method": "direct_1024",
+      "detection_rate": 0.215,
+      "mean_p_fake": 0.2228,
+      "std_p_fake": 0.3405,
+      "mean_high_freq": 6.6763
+    }
+  ],
+  "detection_spread": 0.03,
+  "reference_high_freq": {
+    "real_kaggle": 6.6726,
+    "fake_kaggle": 6.6064
+  }
+}

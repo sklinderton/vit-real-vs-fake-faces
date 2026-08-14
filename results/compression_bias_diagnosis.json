@@ -1,0 +1,77 @@
+[
+  {
+    "class": "Real (Kaggle)",
+    "n": 300,
+    "formats": {
+      "PNG": 300
+    },
+    "modes": {
+      "RGB": 300
+    },
+    "dimensions": {
+      "256x256": 300
+    },
+    "bytes_per_pixel": {
+      "mean": 1.6034,
+      "std": 0.1517,
+      "min": 1.0552,
+      "max": 2.3329
+    },
+    "high_freq_energy": {
+      "mean": 6.6726,
+      "std": 0.2649
+    },
+    "n_distinct_jpeg_qtables": 0,
+    "top_jpeg_qtables": {}
+  },
+  {
+    "class": "Fake (Kaggle)",
+    "n": 300,
+    "formats": {
+      "PNG": 300
+    },
+    "modes": {
+      "RGB": 300
+    },
+    "dimensions": {
+      "256x256": 300
+    },
+    "bytes_per_pixel": {
+      "mean": 1.5909,
+      "std": 0.1163,
+      "min": 1.2511,
+      "max": 1.8895
+    },
+    "high_freq_energy": {
+      "mean": 6.6064,
+      "std": 0.2169
+    },
+    "n_distinct_jpeg_qtables": 0,
+    "top_jpeg_qtables": {}
+  },
+  {
+    "class": "Fake (StyleGAN3 generado)",
+    "n": 200,
+    "formats": {
+      "PNG": 200
+    },
+    "modes": {
+      "RGB": 200
+    },
+    "dimensions": {
+      "256x256": 200
+    },
+    "bytes_per_pixel": {
+      "mean": 1.6605,
+      "std": 0.1538,
+      "min": 1.2971,
+      "max": 2.2467
+    },
+    "high_freq_energy": {
+      "mean": 6.8056,
+      "std": 0.2779
+    },
+    "n_distinct_jpeg_qtables": 0,
+    "top_jpeg_qtables": {}
+  }
+]

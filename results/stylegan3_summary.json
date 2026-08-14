@@ -1,0 +1,15 @@
+{
+  "n_generated": 200,
+  "seed_range": [
+    100000,
+    100199
+  ],
+  "truncation_psi": 1.0,
+  "detection_rate_fake": 0.215,
+  "n_detected_fake": 43,
+  "n_misclassified_real": 157,
+  "mean_p_fake": 0.22281919163961902,
+  "generation_time_s": 18.47,
+  "throughput_img_s": 10.827,
+  "generator": "stylegan3-r-ffhq-1024x1024.pkl"
+}
