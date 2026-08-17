@@ -1,0 +1,105 @@
+{
+  "models": [
+    "cnx",
+    "swin"
+  ],
+  "tta": true,
+  "image_size": 256,
+  "threshold": 0.285,
+  "threshold_selection": "exactitud balanceada, centro de la meseta sobre val_hard",
+  "plateau_width": 95,
+  "evaluations": {
+    "test": {
+      "default": {
+        "threshold": 0.5,
+        "accuracy": 0.9952,
+        "balanced_accuracy": 0.9945,
+        "precision": 1.0,
+        "recall": 0.989,
+        "f1": 0.9945,
+        "auc_roc": 0.9999,
+        "recall_fake": 1.0,
+        "recall_real": 0.989,
+        "n": 2100,
+        "confusion_matrix": [
+          [
+            1188,
+            0
+          ],
+          [
+            10,
+            902
+          ]
+        ]
+      },
+      "tuned": {
+        "threshold": 0.285,
+        "accuracy": 0.9986,
+        "balanced_accuracy": 0.9985,
+        "precision": 0.9989,
+        "recall": 0.9978,
+        "f1": 0.9984,
+        "auc_roc": 0.9999,
+        "recall_fake": 0.9992,
+        "recall_real": 0.9978,
+        "n": 2100,
+        "confusion_matrix": [
+          [
+            1187,
+            1
+          ],
+          [
+            2,
+            910
+          ]
+        ]
+      }
+    },
+    "test_hard": {
+      "default": {
+        "threshold": 0.5,
+        "accuracy": 0.993,
+        "balanced_accuracy": 0.993,
+        "precision": 0.998,
+        "recall": 0.988,
+        "f1": 0.993,
+        "auc_roc": 0.9999,
+        "recall_fake": 0.998,
+        "recall_real": 0.988,
+        "n": 1000,
+        "confusion_matrix": [
+          [
+            499,
+            1
+          ],
+          [
+            6,
+            494
+          ]
+        ]
+      },
+      "tuned": {
+        "threshold": 0.285,
+        "accuracy": 0.997,
+        "balanced_accuracy": 0.997,
+        "precision": 0.998,
+        "recall": 0.996,
+        "f1": 0.997,
+        "auc_roc": 0.9999,
+        "recall_fake": 0.998,
+        "recall_real": 0.996,
+        "n": 1000,
+        "confusion_matrix": [
+          [
+            499,
+            1
+          ],
+          [
+            2,
+            498
+          ]
+        ]
+      }
+    }
+  }
+}
