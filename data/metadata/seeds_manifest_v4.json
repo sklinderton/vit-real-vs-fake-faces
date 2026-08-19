@@ -1,0 +1,83 @@
+{
+  "description": "Dataset v4 \u2014 256 px nativos, psi estratificado",
+  "random_seed": 42,
+  "psi_strata": [
+    {
+      "weight": 0.25,
+      "low": 0.4,
+      "high": 0.7
+    },
+    {
+      "weight": 0.25,
+      "low": 0.7,
+      "high": 0.85
+    },
+    {
+      "weight": 0.5,
+      "low": 0.85,
+      "high": 1.0
+    }
+  ],
+  "psi_mean": 0.7946496339161664,
+  "psi_frac_hard": 0.5,
+  "composition": {
+    "real_kaggle": 9000,
+    "fake_kaggle": 3000,
+    "fake_generated": 9000
+  },
+  "seeds": {
+    "train_pool": [
+      2000000,
+      2008999
+    ],
+    "val_hard": [
+      2500000,
+      2500499
+    ],
+    "test_hard": [
+      2600000,
+      2600499
+    ]
+  },
+  "timings_s": {
+    "generation": 248.2,
+    "preprocessing": 8.7
+  },
+  "splits": [
+    {
+      "split": "train",
+      "n": 16800,
+      "n_real": 7168,
+      "n_fake": 9632,
+      "n_chunks": 9
+    },
+    {
+      "split": "val",
+      "n": 2100,
+      "n_real": 920,
+      "n_fake": 1180,
+      "n_chunks": 2
+    },
+    {
+      "split": "test",
+      "n": 2100,
+      "n_real": 912,
+      "n_fake": 1188,
+      "n_chunks": 2
+    },
+    {
+      "split": "val_hard",
+      "n": 1000,
+      "n_real": 500,
+      "n_fake": 500,
+      "n_chunks": 1
+    },
+    {
+      "split": "test_hard",
+      "n": 1000,
+      "n_real": 500,
+      "n_fake": 500,
+      "n_chunks": 1
+    }
+  ]
+}

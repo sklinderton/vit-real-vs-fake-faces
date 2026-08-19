@@ -1,0 +1,36 @@
+{
+  "n_per_group": 200,
+  "spectral_distances": {
+    "kaggle_real_vs_kaggle_fake": 0.010546551086008549,
+    "kaggle_fake_vs_generated": 0.007330407854169607,
+    "kaggle_real_vs_generated": 0.005930946674197912
+  },
+  "truncation_sweep": [
+    {
+      "truncation_psi": 0.4,
+      "detection_rate": 1.0,
+      "mean_p_fake": 0.9996
+    },
+    {
+      "truncation_psi": 0.55,
+      "detection_rate": 0.975,
+      "mean_p_fake": 0.9678
+    },
+    {
+      "truncation_psi": 0.7,
+      "detection_rate": 0.765,
+      "mean_p_fake": 0.7624
+    },
+    {
+      "truncation_psi": 0.85,
+      "detection_rate": 0.495,
+      "mean_p_fake": 0.4919
+    },
+    {
+      "truncation_psi": 1.0,
+      "detection_rate": 0.23,
+      "mean_p_fake": 0.2436
+    }
+  ],
+  "truncation_spread": 0.77
+}

@@ -1,0 +1,17 @@
+# Configuración del tema de Streamlit.
+# Sin este archivo, Streamlit renderiza sus componentes internos
+# (uploader, selectbox, radio, dataframe) en tema oscuro, que es
+# lo que rompía la interfaz: fondo claro con controles negros.
+[theme]
+base = "light"
+primaryColor = "#7B4FD1"
+backgroundColor = "#F4F6F9"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#0B1B2B"
+font = "sans serif"
+
+[server]
+maxUploadSize = 20
+
+[browser]
+gatherUsageStats = false

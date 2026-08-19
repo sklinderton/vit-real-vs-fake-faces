@@ -31,3 +31,42 @@ __pycache__/
 # ── Sistema ───────────────────────────────────────────────────────────────
 .DS_Store
 *.swp
+
+
+
+# ── Datasets procesados v2 (regenerables con build_dataset_v2.py) ──────────
+
+data/processed_v2/
+
+data/stylegan3_generated/
+
+
+
+
+# ── Datasets procesados (regenerables con build_dataset_*.py) ──────────────
+
+data/processed_v3/
+
+data/processed_v4/
+
+data/stylegan3_generated/
+
+
+
+# ── Checkpoints y assets pesados del dashboard ────────────────────────────
+
+dashboard/assets/*.pt
+
+dashboard/assets/*.pth
+
+*.zip
+
+data/processed_v4/
+data/processed_v3/
+checkpoints/*.pt
+dashboard/assets/*.pt
+*.zip
+
+# ── Sistema ───────────────────────────────────────────────────────────────
+.DS_Store
+*.swp

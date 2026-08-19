@@ -1,0 +1,15 @@
+{
+  "source": "/data/ulead-04/proyecto_paralela/data/processed_v2/test_hard",
+  "seed": 123,
+  "val_hard": {
+    "n": 1000,
+    "n_real": 500,
+    "n_fake": 500
+  },
+  "test_hard_final": {
+    "n": 1000,
+    "n_real": 500,
+    "n_fake": 500
+  },
+  "note": "val_hard gu\u00eda el early stopping del entrenamiento v3; test_hard_final permanece intacto para la evaluaci\u00f3n final."
+}

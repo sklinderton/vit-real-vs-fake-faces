@@ -1,0 +1,109 @@
+{
+  "version": "v4",
+  "epochs_run": 18,
+  "best_epoch": 12,
+  "best_val_hard_auc": 0.9693,
+  "decision_threshold": 0.21999999999999997,
+  "tta": true,
+  "total_time_minutes": 10.4,
+  "hyperparams": {
+    "lr_peak": 2e-05,
+    "warmup_epochs": 1.0,
+    "weight_decay": 0.05,
+    "label_smoothing": 0.03,
+    "batch_size": 32,
+    "patience": 6,
+    "augmentation": "flip, JPEG 70-100, brillo, contraste, saturaci\u00f3n, desenfoque/realce",
+    "dataset": "processed_v3 (psi estratificado, 50 % en [0.85, 1.0])"
+  },
+  "evaluations": {
+    "test": {
+      "default": {
+        "threshold": 0.5,
+        "accuracy": 0.939,
+        "precision": 0.9816,
+        "recall": 0.8761,
+        "f1": 0.9258,
+        "auc_roc": 0.983,
+        "recall_fake": 0.9874,
+        "recall_real": 0.8761,
+        "n": 2100,
+        "confusion_matrix": [
+          [
+            1173,
+            15
+          ],
+          [
+            113,
+            799
+          ]
+        ]
+      },
+      "tuned": {
+        "threshold": 0.22,
+        "accuracy": 0.9524,
+        "precision": 0.971,
+        "recall": 0.9178,
+        "f1": 0.9436,
+        "auc_roc": 0.983,
+        "recall_fake": 0.979,
+        "recall_real": 0.9178,
+        "n": 2100,
+        "confusion_matrix": [
+          [
+            1163,
+            25
+          ],
+          [
+            75,
+            837
+          ]
+        ]
+      }
+    },
+    "test_hard": {
+      "default": {
+        "threshold": 0.5,
+        "accuracy": 0.912,
+        "precision": 0.9518,
+        "recall": 0.868,
+        "f1": 0.9079,
+        "auc_roc": 0.9679,
+        "recall_fake": 0.956,
+        "recall_real": 0.868,
+        "n": 1000,
+        "confusion_matrix": [
+          [
+            478,
+            22
+          ],
+          [
+            66,
+            434
+          ]
+        ]
+      },
+      "tuned": {
+        "threshold": 0.22,
+        "accuracy": 0.92,
+        "precision": 0.9268,
+        "recall": 0.912,
+        "f1": 0.9194,
+        "auc_roc": 0.9679,
+        "recall_fake": 0.928,
+        "recall_real": 0.912,
+        "n": 1000,
+        "confusion_matrix": [
+          [
+            464,
+            36
+          ],
+          [
+            44,
+            456
+          ]
+        ]
+      }
+    }
+  }
+}

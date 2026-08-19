@@ -1,0 +1,57 @@
+{
+  "version": "v2",
+  "epochs_run": 4,
+  "best_val_auc": 0.9263498130781123,
+  "total_time_minutes": 3.19,
+  "gpu": "NVIDIA L40S",
+  "hyperparams": {
+    "batch_size": 32,
+    "lr": 0.0001,
+    "label_smoothing": 0.05,
+    "patience": 3
+  },
+  "evaluations": {
+    "test": {
+      "split": "test",
+      "n": 1800,
+      "accuracy": 0.8222,
+      "precision": 0.9048,
+      "recall": 0.7079,
+      "f1": 0.7943,
+      "auc_roc": 0.9244,
+      "recall_fake": 0.9299,
+      "recall_real": 0.7079,
+      "confusion_matrix": [
+        [
+          862,
+          65
+        ],
+        [
+          255,
+          618
+        ]
+      ]
+    },
+    "test_hard": {
+      "split": "test_hard",
+      "n": 2000,
+      "accuracy": 0.6465,
+      "precision": 0.6363,
+      "recall": 0.684,
+      "f1": 0.6593,
+      "auc_roc": 0.7023,
+      "recall_fake": 0.609,
+      "recall_real": 0.684,
+      "confusion_matrix": [
+        [
+          609,
+          391
+        ],
+        [
+          316,
+          684
+        ]
+      ]
+    }
+  }
+}
