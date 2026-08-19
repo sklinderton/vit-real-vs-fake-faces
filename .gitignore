@@ -66,3 +66,7 @@ data/processed_v3/
 checkpoints/*.pt
 dashboard/assets/*.pt
 *.zip
+
+# ── Sistema ───────────────────────────────────────────────────────────────
+.DS_Store
+*.swp
