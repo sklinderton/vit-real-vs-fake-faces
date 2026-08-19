@@ -30,8 +30,12 @@ import numpy as np
 from PIL import Image
 from torch.utils.data import IterableDataset
 
-# ── Parámetros de preprocesamiento (deben coincidir con el notebook) ─────────
-IMG_SIZE = 224
+# ── Parámetros de preprocesamiento ──────────────────────────────────────────
+# IMG_SIZE se puede sobrescribir con la variable de entorno VIT_IMG_SIZE.
+# A 256 las imágenes del conjunto público quedan en su resolución nativa
+# (fueron publicadas a 256x256), en lugar de reducirlas otro 12 % hasta 224.
+import os
+IMG_SIZE = int(os.environ.get("VIT_IMG_SIZE", "224"))
 IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
 IMAGENET_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
@@ -85,6 +89,55 @@ def preprocess_image(args):
     except Exception as exc:  # noqa: BLE001
         print(f"⚠️ Error procesando {filepath}: {exc}")
         return None, label
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Augmentación en tiempo de carga
+# ══════════════════════════════════════════════════════════════════════════════
+
+def augment_uint8(img_chw, rng):
+    """
+    Aplica perturbaciones aleatorias a una imagen uint8 (C,H,W).
+
+    Se aplica por igual a ambas clases. Ese detalle es esencial: si una
+    transformación afectara solo a una clase, el modelo podría usarla como
+    atajo, que es exactamente el fallo que arrastró la primera versión.
+
+    La compresión JPEG es la pieza más importante del conjunto. Los chunks
+    almacenados son PNG sin pérdida, así que el modelo podría apoyarse en
+    detalles de alta frecuencia que desaparecen en cuanto la imagen pasa por
+    cualquier compresión real. Forzándolo a decidir sobre imágenes
+    comprimidas de forma variable, tiene que buscar rastros más robustos.
+    """
+    from io import BytesIO
+    from PIL import Image, ImageEnhance, ImageFilter
+
+    pil = Image.fromarray(img_chw.transpose(1, 2, 0), "RGB")
+
+    if rng.random() < 0.5:
+        pil = pil.transpose(Image.FLIP_LEFT_RIGHT)
+
+    if rng.random() < 0.55:
+        buf = BytesIO()
+        pil.save(buf, format="JPEG", quality=int(rng.integers(70, 101)))
+        buf.seek(0)
+        pil = Image.open(buf).convert("RGB")
+
+    if rng.random() < 0.35:
+        pil = ImageEnhance.Brightness(pil).enhance(float(rng.uniform(0.85, 1.15)))
+    if rng.random() < 0.35:
+        pil = ImageEnhance.Contrast(pil).enhance(float(rng.uniform(0.85, 1.15)))
+    if rng.random() < 0.25:
+        pil = ImageEnhance.Color(pil).enhance(float(rng.uniform(0.85, 1.15)))
+
+    if rng.random() < 0.3:
+        if rng.random() < 0.5:
+            pil = pil.filter(ImageFilter.GaussianBlur(float(rng.uniform(0.3, 0.9))))
+        else:
+            pil = ImageEnhance.Sharpness(pil).enhance(float(rng.uniform(1.2, 1.9)))
+
+    return np.ascontiguousarray(
+        np.asarray(pil, dtype=np.uint8).transpose(2, 0, 1))
 
 
 def _normalize_uint8_to_tensor(img_uint8):
@@ -197,8 +250,9 @@ class ChunkedNpyIterableDataset(IterableDataset):
     manejarse cómodamente por chunks sin cargar todo de una vez.
     """
 
-    def __init__(self, split_dir, shuffle=True, seed=0):
+    def __init__(self, split_dir, shuffle=True, seed=0, augment=False):
         self.split_dir = Path(split_dir)
+        self.augment = augment
         self.image_files = sorted(self.split_dir.glob("images_chunk*.npy"))
         self.label_files = sorted(self.split_dir.glob("labels_chunk*.npy"))
 
@@ -244,7 +298,10 @@ class ChunkedNpyIterableDataset(IterableDataset):
             if self.shuffle:
                 rng.shuffle(idxs)
             for i in idxs:
-                img = _normalize_uint8_to_tensor(images[i])
+                raw = images[i]
+                if self.augment:
+                    raw = augment_uint8(raw, rng)
+                img = _normalize_uint8_to_tensor(raw)
                 lbl = torch.tensor(int(labels[i]), dtype=torch.long)
                 yield img, lbl
             del images, labels
