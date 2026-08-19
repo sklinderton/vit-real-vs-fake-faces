@@ -1,0 +1,639 @@
+% =====================================================================
+%  Detección de Rostros Sintéticos Generados por StyleGAN3
+%  Entrega Final — Computación Paralela y Distribuida, Universidad LEAD
+% =====================================================================
+%
+%  PARA COMPILAR CON LA PLANTILLA OFICIAL DE IEEE (recomendado en Overleaf):
+%    1. Sustituir la línea \documentclass de abajo por:
+%         \documentclass[conference]{IEEEtran}
+%    2. Eliminar el bloque "CONFIGURACIÓN IEEE MANUAL" completo.
+%    3. Sustituir el bloque de título por el formato \IEEEauthorblockN.
+%
+%  Tal como está, compila con pdflatex sin necesidad de IEEEtran.
+% =====================================================================
+
+\documentclass[10pt,twocolumn,letterpaper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+% El paquete de español de babel no está instalado en todos los entornos.
+% Si lo tienes disponible (Overleaf lo trae), puedes sustituir esta línea por:
+%   \usepackage[spanish,es-nodecimaldot]{babel}
+\usepackage[english]{babel}
+\usepackage{times}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{siunitx}
+\usepackage{xcolor}
+\usepackage{caption}
+\usepackage[hidelinks]{hyperref}
+
+% ---------- CONFIGURACIÓN IEEE MANUAL ----------
+\usepackage[letterpaper,top=0.75in,bottom=1in,left=0.625in,right=0.625in,
+            columnsep=0.25in]{geometry}
+\usepackage{titlesec}
+\titleformat{\section}{\normalfont\normalsize\scshape\centering}{\Roman{section}.}{0.5em}{}
+\titleformat{\subsection}{\normalfont\normalsize\itshape}{\Alph{subsection}.}{0.5em}{}
+\titleformat{\subsubsection}{\normalfont\small\itshape}{\arabic{subsubsection})}{0.5em}{}
+\renewcommand{\thesection}{\Roman{section}}
+\renewcommand{\thesubsection}{\Alph{subsection}}
+\captionsetup[table]{labelsep=newline,textfont=sc,labelfont=sc,justification=centering}
+\captionsetup[figure]{font=small,labelfont=small}
+\setlength{\parindent}{1em}
+\sisetup{output-decimal-marker={,},group-separator={\,},
+         group-minimum-digits=4}
+
+% ------------------------------------------------
+
+\title{\vspace{-1.2em}\textbf{\large Detección de Rostros Sintéticos Generados por
+StyleGAN3: Diagnóstico de Sesgos en Conjuntos Públicos y Diseño de un
+Pipeline Acelerado en Cómputo Paralelo}\vspace{-0.3em}}
+
+\author{
+\begin{tabular}{c}
+Jason Barrantes Sánchez \quad Melany Ramírez Anchía \quad
+Walter Bowyer Carpenter \quad Mauro Espinoza Hernández \\[0.3em]
+\small Bachillerato en Ingeniería en Ciencia de Datos, Universidad LEAD \\
+\small San José, Costa Rica \\
+\small \texttt{\{jason.barrantes, melany.ramirez, walter.bowyer,
+mauro.espinoza\}@ulead.ac.cr}
+\end{tabular}
+}
+\date{}
+
+% Los nombres los fija babel al cargarse, así que se redefinen aquí,
+% después del preámbulo, para que la sustitución tenga efecto.
+\AtBeginDocument{%
+  \renewcommand{\abstractname}{Resumen}%
+  \renewcommand{\refname}{Referencias}%
+  \renewcommand{\tablename}{Tabla}%
+  \renewcommand{\figurename}{Figura}%
+}
+
+\begin{document}
+\maketitle
+
+% =====================================================================
+\begin{abstract}
+\small
+Se presenta un sistema de detección de rostros sintéticos generados por
+StyleGAN3, desarrollado sobre el clúster Kabré del Centro Nacional de Alta
+Tecnología. El aporte principal del trabajo no es el clasificador en sí sino
+el diagnóstico que lo precedió: un modelo Vision Transformer que alcanzaba
+\SI{82}{\percent} de aciertos sobre el conjunto público de referencia
+detectaba solo el \SI{23}{\percent} de los rostros que el mismo generador
+producía en tiempo real. Mediante tres hipótesis falsables evaluadas
+experimentalmente se descartó el sesgo de compresión ($d=0{,}093$) y el del
+filtro de remuestreo (dispersión de \num{3} puntos porcentuales entre seis
+filtros), y se confirmó que el conjunto público había sido generado con un
+parámetro de truncamiento bajo, lo que produjo un atajo estadístico
+explotable: la detección cae de \SI{100}{\percent} con $\psi=0{,}40$ a
+\SI{23}{\percent} con $\psi=1{,}00$. Corregida la composición del conjunto y
+la estrategia de entrenamiento, y sustituido el transformador de parches por
+un conjunto de ConvNeXt-Tiny y Swin-T, el sistema alcanza
+\SI{99{,}7}{\percent} de aciertos y AUC-ROC de \num{0.9999} sobre rostros
+generados con semillas nunca vistas, empleando la quinta parte de los
+parámetros. El pipeline de preprocesamiento paralelo sostiene
+\num{2198}~im\'agenes/s con dieciséis procesos frente a
+\num{511}~im\'agenes/s en ejecución secuencial.
+\end{abstract}
+
+\vspace{0.4em}
+\noindent\textbf{\small Palabras clave---}{\small Vision Transformer, ConvNeXt,
+detección de deepfakes, StyleGAN3, sesgo de conjunto de datos, cómputo
+paralelo, Kabré.}
+\vspace{0.8em}
+
+% =====================================================================
+\section{Introducción}
+
+Los modelos generativos han alcanzado un grado de realismo que vuelve
+inviable la verificación humana de autenticidad. StyleGAN3~\cite{karras2021}
+introdujo una formulación equivariante a traslación y rotación que elimina
+los artefactos de \emph{aliasing} característicos de sus predecesores,
+produciendo rostros cuya distinción a simple vista resulta prácticamente
+imposible.
+
+Este trabajo aborda la clasificación binaria de rostros humanos: dada una
+imagen RGB $I \in \mathbb{R}^{H \times W \times 3}$, determinar si
+corresponde a una fotografía auténtica ($y=1$) o a una síntesis de
+StyleGAN3 ($y=0$). En el marco del curso de Computación Paralela y
+Distribuida, el problema se aborda además desde la perspectiva del
+rendimiento computacional: se cuantifica el beneficio del paralelismo
+multiproceso en el preprocesamiento y el de la aceleración por GPU en el
+entrenamiento.
+
+El hallazgo central del trabajo, sin embargo, fue metodológico. Un modelo
+que parecía funcionar correctamente resultó estar explotando una
+particularidad del conjunto de datos público en lugar de aprender las
+características del generador. La sección~\ref{sec:diagnostico} documenta el
+proceso de diagnóstico que reveló esa situación, que consideramos la
+contribución más transferible de este trabajo.
+
+\subsection{Contribuciones}
+
+\begin{enumerate}\itemsep0.15em
+\item La identificación y caracterización experimental de un sesgo de
+truncamiento en un conjunto de datos público ampliamente disponible, con la
+demostración de que un clasificador entrenado sobre él no generaliza al
+generador que dice representar.
+\item Un protocolo de evaluación que separa explícitamente la distribución de
+entrenamiento de la de prueba mediante semillas disjuntas del espacio
+latente, permitiendo medir generalización real.
+\item La evidencia de que, para esta tarea, una arquitectura convolucional
+supera a un transformador de parches con un tercio de los parámetros,
+resultado contrario a la expectativa inicial del proyecto.
+\item Un pipeline reproducible en infraestructura HPC, verificado mediante
+regeneración completa desde cero.
+\end{enumerate}
+
+% =====================================================================
+\section{Trabajo relacionado}
+
+Wang \emph{et al.}~\cite{wang2020} demostraron que un clasificador
+convolucional entrenado sobre imágenes de un único generador puede
+generalizar a arquitecturas no vistas, sugiriendo la existencia de
+artefactos comunes entre familias de modelos generativos. Nuestros
+resultados matizan esa conclusión: la generalización falla cuando la
+distribución de entrenamiento cubre solo una porción del espacio de salida
+del generador, aun tratándose del mismo generador.
+
+Los Vision Transformer~\cite{dosovitskiy2021} han mostrado desempeño
+competitivo frente a las arquitecturas convolucionales en clasificación de
+imágenes, y diversos trabajos han explorado su uso en detección de
+contenido sintético argumentando que la autoatención captura relaciones
+espaciales de largo alcance. La sección~\ref{sec:arquitecturas} presenta
+evidencia en sentido contrario para esta tarea concreta.
+
+En cuanto a infraestructura, el uso de Polars~\cite{polars} para
+procesamiento columnar multihilo y de Dask~\cite{dask} para cómputo
+distribuido perezoso está documentado en la literatura de ingeniería de
+datos, aunque su aplicación a pipelines de visión orientados a detección de
+contenido sintético permanece poco explorada.
+
+% =====================================================================
+\section{Metodología}
+
+\subsection{Conjunto de datos}
+
+Se emplea el conjunto público \emph{10000 Real vs Fake Faces (StyleGAN3)},
+disponible en Kaggle bajo licencia CC-BY-NC-SA-4.0. Contiene
+\num{20000} imágenes balanceadas (\num{10000} auténticas y \num{10000}
+sintéticas) en formato PNG sin pérdida a resolución $256\times256$.
+
+Conviene señalar una discrepancia detectada durante el trabajo: la
+documentación del conjunto refiere una resolución nativa de
+$1024\times1024$, pero la inspección de los archivos reveló que fueron
+distribuidos ya reducidos a $256\times256$. Este detalle resultó relevante
+para descartar el entrenamiento a mayor resolución
+(sección~\ref{sec:resolucion}).
+
+\subsection{Infraestructura de cómputo}
+
+Todo el procesamiento se ejecutó en el clúster Kabré del CeNAT,
+partición \texttt{nukwa-l40s}. La tabla~\ref{tab:infra} resume la
+configuración empleada.
+
+\begin{table}[t]
+\caption{Configuración de la infraestructura}
+\label{tab:infra}
+\centering\small
+\begin{tabular}{ll}
+\toprule
+\textbf{Recurso} & \textbf{Especificación} \\
+\midrule
+GPU & NVIDIA L40S, \SI{46}{\giga\byte} VRAM \\
+CPU & Intel Xeon Silver 4416+, 20 núcleos \\
+Núcleos asignados & 16 por trabajo \\
+Memoria & \SI{64}{\giga\byte} \\
+CUDA / cuDNN & 12.1 / 9.1 \\
+Almacenamiento & Lustre, cuota de \SI{20}{\giga\byte} \\
+Planificador & SLURM, límite de \SI{4}{\hour} por trabajo \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Diseño del pipeline}
+
+El pipeline se organiza en seis etapas. El inventario de metadatos se
+construye con Polars, que aprovecha los núcleos disponibles sin
+configuración explícita. El preprocesamiento --- decodificación,
+redimensionado y normalización --- se reparte entre dieciséis procesos
+mediante \texttt{ProcessPoolExecutor}, evitando la limitación del
+\emph{Global Interpreter Lock} de CPython. Los tensores resultantes se
+almacenan en fragmentos \texttt{.npy}.
+
+Una decisión de diseño relevante fue almacenar las imágenes como enteros de
+ocho bits sin normalizar, aplicando la normalización de ImageNet en tiempo
+de carga. Frente al almacenamiento en punto flotante de 32 bits, esto
+reduce el espacio en disco por un factor de cuatro
+(\SI{12}{\giga\byte} a \SI{2{,}9}{\giga\byte}), lo cual resultó
+determinante dada la cuota disponible. El costo computacional de normalizar
+al vuelo es despreciable frente al de decodificar la imagen.
+
+% =====================================================================
+\section{Diagnóstico del sesgo de conjunto}
+\label{sec:diagnostico}
+
+\subsection{Observación inicial}
+
+El primer modelo entrenado, un ViT-B/16 con ajuste fino completo, alcanzó
+\SI{82}{\percent} de exhaustividad sobre las imágenes sintéticas del
+conjunto de prueba. Al evaluarlo sobre \num{200} rostros generados en el
+momento con el mismo modelo StyleGAN3-R y semillas nuevas, la detección
+descendió a \SI{23}{\percent}: peor que decidir al azar.
+
+Dado que ambos conjuntos provenían nominalmente del mismo generador, la
+discrepancia solo podía explicarse por una diferencia sistemática entre las
+imágenes del conjunto público y las generadas directamente. Se plantearon
+tres hipótesis falsables.
+
+\subsection{Hipótesis 1: sesgo de compresión}
+
+Se comparó formato, modo de color, dimensiones, peso por píxel y tablas de
+cuantización JPEG sobre \num{300} imágenes de cada clase. Todas resultaron
+ser PNG sin pérdida en modo RGB a $256\times256$. La diferencia en peso por
+píxel entre clases arrojó un tamaño de efecto de $d=0{,}093$, despreciable.
+\textbf{Hipótesis descartada.}
+
+\subsection{Hipótesis 2: sesgo de remuestreo}
+
+Se observó que la energía en altas frecuencias de las imágenes generadas
+($6{,}806$) quedaba fuera del rango de ambas clases del conjunto público
+(auténticas $6{,}673$; sintéticas $6{,}606$), con un tamaño de efecto
+$d\approx0{,}80$ respecto a estas últimas. La hipótesis era que el filtro
+empleado al reducir de $1024$ a $256$ píxeles dejaba una firma distinta.
+
+Se regeneraron las mismas \num{200} semillas aplicando seis filtros
+distintos (Lanczos, bicúbico, bilineal, área, vecino más próximo y
+reducción directa). Pese a que la energía en altas frecuencias varió entre
+$6{,}381$ y $7{,}315$, la tasa de detección permaneció entre
+\SI{18{,}5}{\percent} y \SI{21{,}5}{\percent}: una dispersión de tres puntos
+porcentuales. \textbf{Hipótesis descartada.}
+
+\subsection{Hipótesis 3: sesgo de truncamiento}
+
+El parámetro $\psi$ de truncamiento controla cuánto se aleja una muestra del
+centroide del espacio latente. Valores bajos producen rostros suavizados y
+próximos al promedio; valores altos, rostros diversos y texturados.
+
+Se generaron \num{200} rostros para cada uno de cinco valores de $\psi$,
+evaluándolos con el mismo modelo. La tabla~\ref{tab:truncation} muestra el
+resultado.
+
+\begin{table}[t]
+\caption{Detección según el truncamiento del generador}
+\label{tab:truncation}
+\centering\small
+\begin{tabular}{ccc}
+\toprule
+$\boldsymbol{\psi}$ & \textbf{Detección} & \textbf{$P(\text{sintética})$ media} \\
+\midrule
+0,40 & \SI{100{,}0}{\percent} & 0,9996 \\
+0,55 & \SI{97{,}5}{\percent}  & 0,9678 \\
+0,70 & \SI{76{,}5}{\percent}  & 0,7624 \\
+0,85 & \SI{49{,}5}{\percent}  & 0,4919 \\
+1,00 & \SI{23{,}0}{\percent}  & 0,2436 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+La relación es monótona y el rango abarca \num{77} puntos porcentuales.
+\textbf{Hipótesis confirmada.}
+
+Para verificar que el generador era efectivamente el mismo, se compararon
+los perfiles de potencia radial obtenidos por transformada de Fourier
+bidimensional. La distancia $L_2$ normalizada entre las sintéticas del
+conjunto público y las generadas resultó de \num{0.00733}, menor que la
+distancia entre las dos clases del propio conjunto (\num{0.01055}). Mismo
+generador, distinta configuración.
+
+\subsection{Interpretación}
+
+El conjunto público fue generado con truncamiento bajo, de modo que todas
+sus muestras sintéticas comparten una suavidad característica. El
+clasificador aprendió a reconocer esa suavidad --- una regla válida pero
+incompleta --- en lugar de los artefactos del generador. Ante rostros
+diversos, que se aproximan estadísticamente a fotografías reales, la regla
+deja de aplicar.
+
+Este tipo de sesgo es particularmente insidioso porque no es visible en
+ninguna métrica de validación convencional: el modelo obtiene resultados
+excelentes mientras se le evalúe sobre la misma distribución sesgada.
+
+% =====================================================================
+\section{Corrección y resultados}
+
+\subsection{Reconstrucción del conjunto}
+
+Se rediseñó el conjunto estratificando $\psi$ para concentrar la mitad de
+las muestras sintéticas en el régimen difícil:
+\SI{25}{\percent} en $[0{,}40, 0{,}70]$,
+\SI{25}{\percent} en $[0{,}70, 0{,}85]$ y
+\SI{50}{\percent} en $[0{,}85, 1{,}00]$, con media $\bar{\psi}=0{,}795$.
+
+Se añadió augmentación aplicada por igual a ambas clases: espejo
+horizontal, compresión JPEG de calidad variable entre 70 y 100, ajustes de
+brillo, contraste y saturación, y desenfoque o realce. La compresión resultó
+la componente más relevante: al almacenarse los fragmentos como PNG sin
+pérdida, el modelo podía apoyarse en detalles de alta frecuencia que no
+sobreviven a ninguna imagen del mundo real.
+
+El protocolo de evaluación reserva dos conjuntos generados con semillas
+disjuntas de las de entrenamiento (\num{2000000}--\num{2008999}):
+\texttt{val\_hard} (semillas \num{2500000}+) para seleccionar el punto de
+corte y detener el entrenamiento, y \texttt{test\_hard} (semillas
+\num{2600000}+) que no participa en ninguna decisión. Ambos con
+$\psi=1{,}00$ y balance exacto de \num{500} imágenes por clase.
+
+\subsection{Evolución del sistema}
+
+La tabla~\ref{tab:evolucion} resume las cinco iteraciones sobre el conjunto
+de prueba difícil.
+
+\begin{table}[t]
+\caption{Evolución sobre \texttt{test\_hard} ($\psi=1{,}00$, semillas nuevas)}
+\label{tab:evolucion}
+\centering\small
+\begin{tabular}{lccc}
+\toprule
+\textbf{Versión} & \textbf{Aciertos} & \textbf{AUC} & \textbf{Detecta sint.} \\
+\midrule
+v1 --- base            & ---   & ---     & \SI{23{,}0}{\percent} \\
+v2 --- datos corregidos& ---   & ---     & \SI{60{,}9}{\percent} \\
+v3 --- ajuste de LR    & \SI{89{,}8}{\percent} & 0,9534 & \SI{87{,}0}{\percent} \\
+v4 --- augmentación    & \SI{92{,}0}{\percent} & 0,9679 & \SI{92{,}8}{\percent} \\
+v5 --- tres ViT        & \SI{94{,}0}{\percent} & 0,9832 & \SI{96{,}2}{\percent} \\
+\textbf{ConvNeXt+Swin} & \textbf{\SI{99{,}7}{\percent}} & \textbf{0,9999}
+                       & \textbf{\SI{99{,}8}{\percent}} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Sobre la resolución de entrada}
+\label{sec:resolucion}
+
+Se consideró entrenar a $384$ píxeles bajo la hipótesis de que los
+artefactos del generador residen en altas frecuencias. La idea fue
+descartada por un argumento de coherencia: las imágenes del conjunto
+público fueron distribuidas ya reducidas a $256\times256$, de modo que
+ampliarlas no recupera detalle sino que lo interpola. Los rostros generados
+por nosotros, en cambio, parten de $1024\times1024$ reales. A $384$ píxeles
+las sintéticas tendrían detalle genuino frente al detalle inventado de las
+auténticas, introduciendo exactamente el tipo de atajo que el trabajo buscaba
+eliminar.
+
+Se optó por $256$ píxeles, la resolución nativa del conjunto, evitando el
+descarte del \SI{12}{\percent} de información que suponía reducir a $224$.
+Al no ser $224$ la resolución de preentrenamiento de las codificaciones
+posicionales del ViT, estas se interpolaron de una rejilla de $14\times14$ a
+una de $16\times16$.
+
+\subsection{Comparación de arquitecturas}
+\label{sec:arquitecturas}
+
+El resultado más inesperado del trabajo aparece en la
+tabla~\ref{tab:arquitecturas}.
+
+\begin{table}[t]
+\caption{Desempeño individual por arquitectura sobre \texttt{test\_hard}}
+\label{tab:arquitecturas}
+\centering\small
+\begin{tabular}{lccc}
+\toprule
+\textbf{Arquitectura} & \textbf{Parámetros} & \textbf{Aciertos} & \textbf{AUC} \\
+\midrule
+ViT-B/16        & \num{85{,}8}\,M & \SI{93{,}3}{\percent} & 0,9778 \\
+Swin-T          & \num{27{,}5}\,M & \SI{97{,}3}{\percent} & 0,9995 \\
+ConvNeXt-Tiny   & \num{27{,}8}\,M & \SI{99{,}6}{\percent} & 0,9999 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+ConvNeXt-Tiny supera al Vision Transformer por más de seis puntos
+porcentuales empleando un tercio de los parámetros. La explicación
+propuesta remite al mecanismo de cada arquitectura: el ViT particiona la
+imagen en parches de $16\times16$ píxeles y proyecta cada uno a un vector,
+promediando implícitamente la información interna del parche. Los rastros
+que deja StyleGAN3 --- textura de piel, transición del cabello, patrones del
+iris --- operan a una escala menor que ese parche, de modo que se atenúan
+en la proyección. Las convoluciones jerárquicas, que recorren la imagen con
+filtros pequeños y construyen representaciones progresivamente más
+abstractas, preservan esa información.
+
+\subsection{Conjunto de modelos y punto de corte}
+
+Promediar las predicciones de ConvNeXt-Tiny y Swin-T, cada uno evaluado
+sobre la imagen y su reflejo horizontal, eleva el AUC a \num{0.9999}.
+Resulta notable que este conjunto de dos modelos
+(\num{55}\,M de parámetros) supere al de cinco que incluía los
+tres ViT (\num{313}\,M), que alcanzaba \SI{97{,}9}{\percent}.
+
+El punto de corte se seleccionó sobre \texttt{val\_hard} tomando el centro
+de la meseta de valores que quedan dentro del \SI{0{,}4}{\percent} del
+óptimo, en lugar del máximo exacto. En iteraciones previas el máximo exacto
+oscilaba entre $0{,}05$ y $0{,}94$ de una época a otra --- ruido, no
+señal --- y llegó a producir un umbral que rendía peor que el valor por
+defecto. El criterio de meseta arrojó $\tau=0{,}285$ sobre una región que
+abarca el \SI{52}{\percent} de la rejilla explorada, indicando una
+separación entre clases lo bastante nítida como para que la elección exacta
+resulte poco crítica.
+
+Aplicado a \texttt{test\_hard}, este umbral logra \SI{99{,}70}{\percent}
+frente al \SI{99{,}90}{\percent} que habría obtenido el mejor umbral
+posible seleccionado sobre el propio conjunto de prueba. Esa diferencia de
+dos décimas es el costo metodológico de no inspeccionar el conjunto final,
+y se reporta explícitamente.
+
+% =====================================================================
+\section{Análisis de rendimiento}
+
+\subsection{Preprocesamiento paralelo}
+
+Se midió el rendimiento del preprocesamiento sobre \num{2000} imágenes
+variando el número de procesos, con tres repeticiones por configuración y
+calentamiento previo de la caché del sistema de archivos. La
+tabla~\ref{tab:throughput} recoge los resultados.
+
+\begin{table}[t]
+\caption{Rendimiento del preprocesamiento paralelo}
+\label{tab:throughput}
+\centering\small
+\begin{tabular}{ccc}
+\toprule
+\textbf{Procesos} & \textbf{Tiempo (s)} & \textbf{Imágenes/s} \\
+\midrule
+1  & 3,913 & 511,1 \\
+4  & 2,470 & 809,9 \\
+8  & 1,354 & 1477,1 \\
+12 & 1,061 & 1884,3 \\
+16 & 0,910 & 2198,3 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+El rendimiento crece de forma monótona hasta un factor de $4{,}3$ con
+dieciséis procesos. En la construcción del conjunto completo, la etapa de
+preprocesamiento sostuvo \num{2396}~im\'agenes/s sobre
+\num{9000} imágenes.
+
+\subsubsection{Limitación de la medición}
+
+Debe señalarse una limitación metodológica. La referencia secuencial
+resultó inestable pese a tres estrategias correctivas sucesivas:
+calentamiento completo de la caché, fijación a un solo hilo de las
+bibliotecas numéricas mediante \texttt{OMP\_NUM\_THREADS} y variables
+equivalentes, y toma del mínimo entre repeticiones. La medición con dos
+procesos arrojó valores por debajo de la unidad, lo cual es
+físicamente implausible en una carga sin dependencias entre elementos.
+
+La causa más probable es que el trabajo se ejecuta bajo un \emph{cgroup} de
+SLURM que restringe a dieciséis de los veinte núcleos físicos del nodo,
+mientras el reparto interno entre el proceso padre y los hijos queda a
+criterio del planificador del sistema operativo. En consecuencia, el
+tiempo $T_1$ no corresponde a una ejecución estrictamente secuencial.
+
+Por ese motivo se reporta el rendimiento absoluto, que es consistente entre
+corridas, y se omite el cálculo formal de \emph{speedup} y eficiencia
+paralela, que requeriría un $T_1$ fiable. Una medición rigurosa exigiría un
+nodo en régimen exclusivo con afinidad de CPU fijada explícitamente.
+
+\subsection{Cuello de botella}
+
+El comportamiento observado sugiere que la carga está limitada por
+entrada/salida más que por cómputo. Las imágenes residen en un sistema de
+archivos Lustre compartido por red, y el rendimiento se aplana al
+aproximarse a los doce procesos. La optimización natural consistiría en
+precargar el conjunto a almacenamiento local del nodo antes de procesar.
+
+\subsection{Entrenamiento en GPU}
+
+El entrenamiento de ConvNeXt-Tiny sostuvo \num{614}~im\'agenes/s con
+precisión mixta, completando quince épocas sobre \num{16800} imágenes en
+\SI{7{,}9}{\minute}. Swin-T alcanzó \num{423}~im\'agenes/s y
+diecisiete épocas en \SI{13{,}1}{\minute}. La generación de rostros con
+StyleGAN3 sostuvo \num{36{,}8}~im\'agenes/s a resolución
+$1024\times1024$.
+
+% =====================================================================
+\section{Reproducibilidad}
+
+Los rostros sintéticos no se almacenan: se registran sus semillas y el
+valor de $\psi$ empleado, lo que permite regenerarlos de forma determinista
+sin coste de almacenamiento.
+
+Esta propiedad se verificó de manera involuntaria pero concluyente. Una
+operación de limpieza de disco eliminó los modelos entrenados y el conjunto
+procesado. La reconstrucción completa --- redescarga del conjunto público,
+regeneración de las \num{10000} imágenes sintéticas y reentrenamiento de
+ambas arquitecturas --- tomó treinta y cinco minutos y devolvió resultados
+idénticos hasta el cuarto decimal: AUC de \num{0.9999} y \num{0.9995} para
+ConvNeXt y Swin respectivamente, umbral $\tau=0{,}285$, meseta de
+\num{95} valores. Se documenta aquí porque constituye una verificación de
+reproducibilidad más estricta que cualquier prueba planificada.
+
+% =====================================================================
+\section{Discusión y limitaciones}
+
+El sistema alcanza \SI{99{,}7}{\percent} de aciertos, cifra que conviene
+interpretar con precisión. Lo que el modelo distingue son \emph{rostros
+generados por StyleGAN3-R frente a fotografías del conjunto FFHQ}. No es un
+detector universal de contenido generado por inteligencia artificial: ante
+salidas de modelos de difusión como Stable Diffusion o Midjourney, o incluso
+de versiones anteriores de StyleGAN, cabe esperar un desempeño
+sustancialmente menor.
+
+Esa expectativa se sustenta en el propio hallazgo del trabajo. Si un cambio
+en el parámetro de truncamiento del mismo generador bastó para reducir la
+detección del \SI{82}{\percent} al \SI{23}{\percent}, un cambio de
+arquitectura generativa producirá con seguridad un desplazamiento mayor. La
+lección es general: los detectores de contenido sintético aprenden la firma
+del generador con el que fueron entrenados, y la validación debe diseñarse
+para exponer esa dependencia en lugar de ocultarla.
+
+Como línea de trabajo futura, la más pertinente sería evaluar la
+transferencia a otros generadores y, en su caso, entrenar sobre una mezcla
+de arquitecturas generativas para inducir invarianza.
+
+% =====================================================================
+\section{Conclusiones}
+
+Un clasificador con métricas aparentemente satisfactorias sobre un conjunto
+público resultó estar explotando un artefacto de la construcción de ese
+conjunto. El diagnóstico requirió formular hipótesis falsables y
+descartarlas experimentalmente: dos resultaron incorrectas antes de
+identificar la causa real.
+
+La corrección del sesgo elevó la detección del \SI{23}{\percent} al
+\SI{87}{\percent}, y el cambio de arquitectura la llevó al
+\SI{99{,}8}{\percent}. Contra la expectativa inicial del proyecto ---
+centrado en Vision Transformers desde su planteamiento --- la arquitectura
+convolucional resultó marcadamente superior para esta tarea, con un tercio
+de los parámetros.
+
+El trabajo deja dos conclusiones transferibles. La primera es que las
+métricas de validación no detectan sesgos compartidos entre los conjuntos de
+entrenamiento y prueba; validar contra datos generados bajo condiciones
+deliberadamente distintas es la única forma de exponerlos. La segunda es que
+la elección de arquitectura debe responder a la naturaleza de la señal
+buscada: cuando esa señal reside en texturas de escala fina, un
+transformador de parches grandes la atenúa antes de poder analizarla.
+
+% =====================================================================
+\section*{Disponibilidad}
+
+El código fuente, los cuadernos, los scripts de ejecución y los resultados
+experimentales están disponibles en
+\url{https://github.com/sklinderton/vit-real-vs-fake-faces}. Los conjuntos
+procesados y los modelos entrenados se excluyen del repositorio por su
+tamaño; el repositorio incluye los scripts y manifiestos de semillas que
+permiten regenerarlos íntegramente.
+
+% =====================================================================
+\begin{thebibliography}{9}
+\small
+
+\bibitem{goodfellow2014}
+I.~J. Goodfellow \emph{et al.}, ``Generative adversarial nets,'' in
+\emph{Advances in Neural Information Processing Systems}, vol.~27, 2014.
+
+\bibitem{karras2021}
+T.~Karras, M.~Aittala, S.~Laine, E.~Härkönen, J.~Hellsten, J.~Lehtinen, and
+T.~Aila, ``Alias-free generative adversarial networks,'' in \emph{Advances
+in Neural Information Processing Systems}, vol.~34, 2021.
+
+\bibitem{dosovitskiy2021}
+A.~Dosovitskiy \emph{et al.}, ``An image is worth 16x16 words: Transformers
+for image recognition at scale,'' in \emph{International Conference on
+Learning Representations}, 2021.
+
+\bibitem{liu2022}
+Z.~Liu, H.~Mao, C.-Y. Wu, C.~Feichtenhofer, T.~Darrell, and S.~Xie, ``A
+ConvNet for the 2020s,'' in \emph{Proceedings of the IEEE/CVF Conference on
+Computer Vision and Pattern Recognition}, 2022, pp. 11976--11986.
+
+\bibitem{liu2021swin}
+Z.~Liu \emph{et al.}, ``Swin Transformer: Hierarchical vision transformer
+using shifted windows,'' in \emph{Proceedings of the IEEE/CVF International
+Conference on Computer Vision}, 2021, pp. 10012--10022.
+
+\bibitem{wang2020}
+S.-Y. Wang, O.~Wang, R.~Zhang, A.~Owens, and A.~A. Efros, ``CNN-generated
+images are surprisingly easy to spot... for now,'' in \emph{Proceedings of
+the IEEE/CVF Conference on Computer Vision and Pattern Recognition}, 2020,
+pp. 8695--8704.
+
+\bibitem{dask}
+Dask Development Team, ``Dask: Library for dynamic task scheduling,'' 2016.
+[En línea]. Disponible: \url{https://dask.org}
+
+\bibitem{polars}
+Polars Developers, ``Polars: Fast multi-threaded DataFrame library,'' 2023.
+[En línea]. Disponible: \url{https://pola.rs}
+
+\end{thebibliography}
+
+\end{document}

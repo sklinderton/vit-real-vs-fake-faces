@@ -1,0 +1,93 @@
+{
+  "node": "nukwa-04.cnca",
+  "cpu_count": 20,
+  "n_images": 2000,
+  "repeats": 3,
+  "image_size": 256,
+  "measurements": [
+    {
+      "workers": 1,
+      "time_s": 3.9129,
+      "throughput_img_s": 511.1,
+      "speedup": 1.0,
+      "efficiency": 1.0,
+      "times_all": [
+        6.4191,
+        3.9246,
+        3.9129
+      ],
+      "dispersion": 0.6405
+    },
+    {
+      "workers": 2,
+      "time_s": 4.5926,
+      "throughput_img_s": 435.5,
+      "speedup": 0.852,
+      "efficiency": 0.426,
+      "times_all": [
+        4.5926,
+        4.7891,
+        4.7589
+      ],
+      "dispersion": 0.0428
+    },
+    {
+      "workers": 4,
+      "time_s": 2.4695,
+      "throughput_img_s": 809.9,
+      "speedup": 1.5845,
+      "efficiency": 0.3961,
+      "times_all": [
+        2.4729,
+        2.5041,
+        2.4695
+      ],
+      "dispersion": 0.014
+    },
+    {
+      "workers": 8,
+      "time_s": 1.354,
+      "throughput_img_s": 1477.1,
+      "speedup": 2.89,
+      "efficiency": 0.3612,
+      "times_all": [
+        1.354,
+        1.357,
+        1.3858
+      ],
+      "dispersion": 0.0235
+    },
+    {
+      "workers": 12,
+      "time_s": 1.0614,
+      "throughput_img_s": 1884.3,
+      "speedup": 3.6866,
+      "efficiency": 0.3072,
+      "times_all": [
+        1.1282,
+        1.0614,
+        1.1333
+      ],
+      "dispersion": 0.0677
+    },
+    {
+      "workers": 16,
+      "time_s": 0.9098,
+      "throughput_img_s": 2198.3,
+      "speedup": 4.3009,
+      "efficiency": 0.2688,
+      "times_all": [
+        1.0269,
+        0.9098,
+        1.236
+      ],
+      "dispersion": 0.3586
+    }
+  ],
+  "best_speedup": 4.3009,
+  "best_workers": 16,
+  "efficiency_at_best": 0.2688,
+  "amdahl_serial_fraction": 0.1813,
+  "saturation_workers": null,
+  "bottleneck": "no determinado"
+}

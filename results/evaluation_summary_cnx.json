@@ -10,7 +10,7 @@
     15
   ],
   "best_val_hard_auc": 0.9997,
-  "total_time_minutes": 8.21,
+  "total_time_minutes": 7.92,
   "evaluations": {
     "test": {
       "threshold": 0.5,

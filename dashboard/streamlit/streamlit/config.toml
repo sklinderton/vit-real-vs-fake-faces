@@ -1,0 +1,16 @@
+# Tema oscuro. Sin este archivo Streamlit decide por su cuenta y los
+# componentes internos (uploader, selectbox, radio, dataframe) quedan
+# descoordinados con el CSS de la aplicación.
+[theme]
+base = "dark"
+primaryColor = "#A78BFA"
+backgroundColor = "#0F141A"
+secondaryBackgroundColor = "#171E27"
+textColor = "#E8EDF3"
+font = "sans serif"
+
+[server]
+maxUploadSize = 20
+
+[browser]
+gatherUsageStats = false

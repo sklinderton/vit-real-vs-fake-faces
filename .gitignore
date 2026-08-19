@@ -61,3 +61,8 @@ dashboard/assets/*.pth
 
 *.zip
 
+data/processed_v4/
+data/processed_v3/
+checkpoints/*.pt
+dashboard/assets/*.pt
+*.zip
