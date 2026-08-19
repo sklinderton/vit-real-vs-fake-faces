@@ -1,125 +1,116 @@
-# Detección de Rostros Sintéticos Generados por StyleGAN3 mediante Vision Transformers
+# Detección de Rostros Sintéticos Generados por StyleGAN3
 
-**Curso:** Computación Paralela y Distribuida | LEAD University
+**Curso:** Computación Paralela y Distribuida · Universidad LEAD
 **Profesor:** Johansell Villalobos Cubillo
 **Equipo:** Jason Barrantes Sánchez · Melany Ramírez Anchía · Walter Bowyer Carpenter · Mauro Espinoza Hernández
-**Plataforma:** Kabré Supercomputer — CeNAT, Costa Rica (partición `nukwa-l40s`, NVIDIA L40S)
+**Infraestructura:** Clúster Kabré (CeNAT), partición `nukwa-l40s` con NVIDIA L40S
 
 ---
 
-## Estado del proyecto — Entrega 2 (Implementación Inicial)
+## Resumen
 
-| Etapa | Estado |
-|---|---|
-| 1. Adquisición y gestión de datos (Polars, Parquet) | ✅ Completo |
-| 2. Preprocesamiento paralelo (ProcessPoolExecutor, Dask) | ✅ Completo |
-| 3. Análisis exploratorio y estadístico | ✅ Completo |
-| 4. Modelado con Vision Transformer | ✅ Completo — entrenado en GPU real |
-| 5. Postprocesamiento y análisis de resultados | ✅ Completo para esta entrega |
-| 6. Dashboard interactivo | 🔜 Próxima entrega |
-| Generación StyleGAN3 (rostros nuevos para test de generalización) | 🔜 En progreso |
+Sistema de clasificación binaria que distingue fotografías auténticas de rostros
+generados por StyleGAN3. Alcanza **99.7 % de aciertos** y **AUC-ROC de 0.9999**
+sobre rostros creados con semillas que el modelo nunca vio, al máximo de
+diversidad del generador.
 
----
-
-## Descripción del Problema
-
-Clasificación binaria de rostros humanos: dado I ∈ R^(H×W×3), predecir si corresponde a
-una fotografía real (y=1) o a un rostro sintético generado por StyleGAN3 (y=0). El proyecto
-además cuantifica el beneficio de las herramientas de cómputo paralelo y distribuido usadas
-en cada etapa del pipeline.
-
-## Dataset
-
-- **Fuente:** [10000 Real vs Fake Faces (StyleGAN3)](https://www.kaggle.com/datasets/troykueh/real-vs-fake-faces-stylegan3) — Kaggle
-- **Total:** 20,000 imágenes (10,000 reales + 10,000 generadas por StyleGAN3)
-- **Resolución original:** 1024×1024 px, 2.11 GB en disco
-- **Split estratificado 80/10/10:** train=16,000 · val=2,000 · test=2,000
+El aporte principal no es el clasificador sino el diagnóstico que lo precedió.
+La primera versión obtenía 82 % sobre el conjunto público de referencia pero
+solo **23 %** sobre rostros que el mismo generador producía en el momento. La
+causa resultó ser un sesgo en la construcción del conjunto público, identificado
+tras descartar experimentalmente dos hipótesis alternativas.
 
 ---
 
-## Resultados Obtenidos
+## Resultados
 
-### Preprocesamiento Paralelo (ProcessPoolExecutor, 16 workers)
+### Evolución sobre el conjunto difícil
 
-| Split | Imágenes | Tiempo | Throughput |
+Rostros con truncamiento ψ = 1.0 y semillas disjuntas del entrenamiento.
+
+| Versión | Aciertos | AUC-ROC | Detecta sintéticas |
 |---|---|---|---|
-| Train | 16,000 | 6.8 s | 2,358 img/s |
-| Val | 2,000 | 1.3 s | 1,550 img/s |
-| Test | 2,000 | 1.4 s | 1,435 img/s |
+| v1 — línea base | — | — | 23.0 % |
+| v2 — datos corregidos | — | — | 60.9 % |
+| v3 — ajuste de ritmo de aprendizaje | 89.8 % | 0.9534 | 87.0 % |
+| v4 — augmentación y umbral | 92.0 % | 0.9679 | 92.8 % |
+| v5 — tres ViT promediados | 94.0 % | 0.9832 | 96.2 % |
+| **ConvNeXt-Tiny + Swin-T** | **99.7 %** | **0.9999** | **99.8 %** |
 
-Formato de almacenamiento: `uint8` crudo (sin normalizar), normalización ImageNet aplicada
-en tiempo de carga — reduce el uso de disco 4× (12 GB → 2.9 GB) sin costo de rendimiento
-relevante, crítico dado el límite de cuota de 20 GB en Kabré.
+### Comparación de arquitecturas
 
-### Entrenamiento del Vision Transformer
+Resultado contrario a la expectativa inicial del proyecto: la red convolucional
+supera al Vision Transformer con un tercio de los parámetros.
 
-- **Arquitectura:** ViT-B/16 (torchvision), preentrenado en ImageNet-1K, backbone completo sin congelar
-- **Parámetros entrenables:** 85,800,194
-- **Hardware:** NVIDIA L40S (46 GB VRAM), CUDA 12.1, cuDNN 9.1, precisión mixta (AMP fp16)
-- **Optimizador:** AdamW, lr=1e-4, weight_decay=0.01, batch_size=32
-- **Épocas:** 15 completadas en **10.75 minutos** (throughput promedio: 565 img/s)
-- **Mejor modelo:** época 11 (checkpointing automático por AUC-ROC de validación, no por última época)
-
-### Métricas en Test Set (2,000 imágenes, nunca vistas en entrenamiento)
-
-| Métrica | Valor |
-|---|---|
-| Accuracy | 0.8700 |
-| Precision | 0.8376 |
-| Recall | 0.9180 |
-| F1-Score | 0.8760 |
-| **AUC-ROC** | **0.9438** |
-
-| Clase | Precision | Recall | F1 |
+| Arquitectura | Parámetros | Aciertos | AUC-ROC |
 |---|---|---|---|
-| Fake | 0.91 | 0.82 | 0.86 |
-| Real | 0.84 | 0.92 | 0.88 |
+| ViT-B/16 | 85.8 M | 93.3 % | 0.9778 |
+| Swin-T | 27.5 M | 97.3 % | 0.9995 |
+| **ConvNeXt-Tiny** | **27.8 M** | **99.6 %** | **0.9999** |
 
-**Análisis de errores:** el modelo detecta rostros reales (recall 92%) mejor que rostros
-generados (recall 82%), consistente con el objetivo de diseño de StyleGAN3 de minimizar
-artefactos detectables. El modelo tiende a clasificar rostros fake difíciles como reales
-más que al revés.
+Los rastros que deja StyleGAN3 —textura de piel, transición del cabello, patrones
+del iris— operan a una escala menor que los parches de 16×16 píxeles del ViT, que
+los promedia al proyectarlos. Las convoluciones jerárquicas los preservan.
 
-### Interpretabilidad y Validación Cualitativa
+### Rendimiento del preprocesamiento paralelo
 
-- Mapas de atención del token `[CLS]` extraídos interceptando `nn.MultiheadAttention`
-- Función de clasificación de fotos arbitrarias: probada con una foto personal fuera del
-  dataset, clasificada correctamente como **REAL con 99.99% de confianza**
-
----
-
-## Gestión de Problemas (obstáculos encontrados y solución aplicada)
-
-| # | Obstáculo | Solución |
+| Procesos | Tiempo (s) | Imágenes/s |
 |---|---|---|
-| 1 | SSH directo bloqueado por firewall institucional | Acceso vía Open OnDemand Shell (SSH funcionalmente equivalente) |
-| 2 | Home de Kabré limitado a 10 GB, se llenó dos veces | Migración completa del proyecto a `/data` (Lustre, cuota 20 GB) |
-| 3 | Particiones CPU estándar (`kura`) sin GPU | Descubrimiento y verificación de particiones `nukwa-v100`/`nukwa-l40s` vía `nvidia-smi` |
-| 4 | Sintaxis `--gres=gpu:1` no soportada en Kabré | GPU se asigna automáticamente por partición, sin bandera `--gres` |
-| 5 | Escritura de disco interrumpida a mitad de un chunk (cuota excedida) | Rediseño de almacenamiento a `uint8` (4× más liviano) con normalización on-the-fly |
-| 6 | Límite de 4 horas por trabajo SLURM en GPU | `train_vit.py` con checkpointing por época y bandera `--resume` |
-| 7 | Sobreajuste detectado desde época ~10-12 | Checkpointing por mejor AUC de validación (no última época) selecciona automáticamente el modelo con mejor generalización |
-| 8 | Intento previo del equipo en CPU (Mac) inviable — 85.8M parámetros | Migración a GPU real en Kabré resolvió el cuello de botella computacional |
+| 1 | 3.913 | 511 |
+| 4 | 2.470 | 810 |
+| 8 | 1.354 | 1 477 |
+| 12 | 1.061 | 1 884 |
+| 16 | 0.910 | 2 198 |
+
+> **Limitación documentada.** La referencia secuencial resultó inestable pese a
+> calentar la caché, fijar las bibliotecas numéricas a un solo hilo y promediar
+> repeticiones. La causa probable es que SLURM restringe el trabajo a 16 de los 20
+> núcleos físicos mediante cgroups, y el reparto interno entre proceso padre e hijos
+> queda a criterio del planificador del sistema. Se reporta el rendimiento absoluto,
+> que sí es consistente, y se omite el cálculo formal de speedup. Ver sección VI-A-1
+> del informe.
 
 ---
 
-## Requisitos de Software
+## El diagnóstico
+
+Tres hipótesis falsables, evaluadas experimentalmente:
+
+| Hipótesis | Veredicto | Evidencia |
+|---|---|---|
+| Compresión distinta entre clases | Descartada | Todo el conjunto es PNG sin pérdida. Diferencia en bytes por píxel: d = 0.093 |
+| Filtro de redimensionado distinto | Descartada | Seis filtros probados; detección entre 18.5 % y 21.5 % (3 puntos de rango) |
+| **Truncamiento del generador** | **Confirmada** | De 100 % con ψ = 0.40 a 23 % con ψ = 1.00 (77 puntos de rango) |
+
+El análisis espectral confirmó que el generador era el mismo: la distancia entre
+los perfiles de frecuencia de las sintéticas del conjunto y las generadas
+(0.00733) resultó menor que entre las dos clases del propio conjunto (0.01055).
+
+El conjunto público se había generado con truncamiento bajo, produciendo rostros
+suavizados. El modelo aprendió a reconocer esa suavidad en lugar de los artefactos
+del generador.
+
+---
+
+## Requisitos
 
 ```
 torch, torchvision (CUDA 12.1)
 polars, dask[dataframe], pyarrow
 Pillow, numpy, pandas, scikit-learn
-matplotlib, seaborn
+matplotlib, seaborn, plotly
+streamlit
 jupyter, jupyterlab, ipykernel
-imagehash, scipy (usados en EDA avanzado)
+kaggle, imagehash, scipy, ninja, setuptools<81
 ```
 
-Ver `requirements.txt` para versiones exactas.
+`setuptools<81` es necesario porque StyleGAN3 depende de `pkg_resources`, removido
+en versiones posteriores.
 
-## Instrucciones de Instalación
+## Instalación
 
 ```bash
-# En Kabré, dentro de una sesión con GPU (nukwa-l40s o nukwa-v100)
+# En un nodo con GPU del clúster
 curl -LsSf https://astral.sh/uv/install.sh | sh
 source ~/.bashrc
 
@@ -129,85 +120,151 @@ source /data/<usuario>/envs/vit_faces/bin/activate
 uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 uv pip install polars "dask[dataframe]" pyarrow Pillow tqdm pandas numpy \
     matplotlib seaborn scikit-learn ipykernel jupyter jupyterlab nbconvert \
-    kaggle imagehash scipy
+    kaggle imagehash scipy ninja "setuptools<81"
 
 python -m ipykernel install --user --name=vit_faces --display-name "Python (vit_faces)"
 ```
 
-## Instrucciones de Ejecución
+### Dependencias externas
 
 ```bash
-# 1. Preprocesamiento paralelo (regenera data/processed/ desde data/raw/)
-python run_preprocessing.py
+git clone https://github.com/NVlabs/stylegan3.git /data/<usuario>/stylegan3
 
-# 2. Entrenamiento del ViT (como trabajo SLURM, corre desatendido)
-sbatch submit_train_vit.sh
-squeue -u $USER                              # verificar estado
-tail -f logs/vit_train_<JOBID>.log           # seguir progreso
-
-# 3. Evaluación (notebook interactivo, requiere checkpoints/vit_best.pt)
-jupyter lab
-# Abrir notebooks/03_evaluacion_vit.ipynb, kernel "Python (vit_faces)"
+mkdir -p /data/<usuario>/stylegan3_models
+cd /data/<usuario>/stylegan3_models
+wget https://api.ngc.nvidia.com/v2/models/nvidia/research/stylegan3/versions/1/files/stylegan3-r-ffhq-1024x1024.pkl
 ```
 
-> Los checkpoints entrenados (`checkpoints/*.pt`) **no están incluidos en este
-> repositorio** por exceder el límite de tamaño de archivo de GitHub (~1GB+ cada
-> uno, dado que ViT-B/16 tiene 85.8M parámetros). Ejecuta `sbatch submit_train_vit.sh`
-> para regenerarlos — el entrenamiento completo toma ~11 minutos en una GPU L40S.
-
-## Instrucciones para Obtener el Dataset
+### Conjunto de datos
 
 ```bash
 mkdir -p ~/.kaggle
-echo "TU_TOKEN_KAGGLE" > ~/.kaggle/access_token
+echo "TU_TOKEN" > ~/.kaggle/access_token
 chmod 600 ~/.kaggle/access_token
 
+cd data/raw
 kaggle datasets download -d troykueh/real-vs-fake-faces-stylegan3
-unzip real-vs-fake-faces-stylegan3.zip -d data/raw/
+unzip real-vs-fake-faces-stylegan3.zip
 ```
 
 ---
 
-## Estructura del Repositorio
+## Reproducción completa
+
+```bash
+# 1. Verificar que el modelo se construye a 256 px (1 min)
+python test_256_setup.py
+
+# 2. Construir el conjunto: 9 000 rostros generados con ψ estratificado (6 min)
+python build_dataset_v4.py
+
+# 3. Entrenar los dos miembros del ensamble (21 min)
+python train_hetero.py --arch convnext --tag cnx
+python train_hetero.py --arch swin     --tag swin
+
+# 4. Evaluar el ensamble y fijar el umbral (2 min)
+python evaluate_ensemble.py --tags cnx swin
+
+# 5. Medir el rendimiento paralelo (6 min)
+python benchmark_paralelo.py --images 2000
+```
+
+Los rostros sintéticos **no se almacenan**: se registran sus semillas y valores de
+ψ en `data/metadata/seeds_manifest_v4.json`, lo que permite regenerarlos de forma
+determinista.
+
+Esta propiedad se verificó de forma involuntaria: una limpieza de disco eliminó
+los modelos y el conjunto procesado. La reconstrucción completa tomó 35 minutos y
+devolvió resultados **idénticos hasta el cuarto decimal**.
+
+---
+
+## Dashboard
+
+Aplicación Streamlit que corre en máquina local, sin GPU.
+
+```bash
+cd dashboard
+uv venv .venv --python 3.11
+source .venv/bin/activate      # en Windows: .\.venv\Scripts\Activate.ps1
+uv pip install -r requirements.txt
+streamlit run app.py
+```
+
+Requiere copiar a `dashboard/assets/`:
+
+| Origen | Destino |
+|---|---|
+| `checkpoints/vit_v5_cnx.pt` | `assets/` |
+| `checkpoints/vit_v5_swin.pt` | `assets/` |
+| `results/evaluation_summary_ensemble.json` | `assets/` |
+| `results/training_log_cnx.csv` | `assets/` |
+| `dashboard/assets/stylegan3_pool/` | ya incluido |
+
+Tres modos de entrada: subir un archivo, tomar una foto con la cámara, o pedir un
+rostro generado por StyleGAN3. Incluye secciones explicativas del modelo, del
+diagnóstico y de los resultados, con gráficas interactivas.
+
+---
+
+## Estructura
 
 ```
 proyecto_paralela/
 ├── data/
-│   ├── raw/                          # Dataset original (no incluido, ver instrucciones)
-│   ├── processed/                    # Tensores uint8 preprocesados (no incluido, regenerable)
-│   ├── metadata/                     # Inventario Parquet + estadísticas
-│   ├── plots/                        # Gráficas del EDA
-│   └── uploads/                      # Carpeta para fotos propias a clasificar
+│   ├── raw/                       # Conjunto público (no versionado)
+│   ├── processed_v4/              # Tensores uint8 a 256 px (no versionado)
+│   ├── metadata/                  # Inventarios y manifiestos de semillas
+│   ├── eda_avanzado/              # Resultados del análisis exploratorio
+│   └── plots/
 ├── notebooks/
 │   ├── 01_adquisicion_preprocesamiento.ipynb
 │   ├── 02_eda_avanzado.ipynb
 │   └── 03_evaluacion_vit.ipynb
 ├── src/
-│   └── preprocessing_worker.py       # Worker paralelo + Dataset classes (uint8 + norm on-the-fly)
-├── run_preprocessing.py              # Script de preprocesamiento paralelo standalone
-├── train_vit.py                      # Entrenamiento ViT con checkpointing
-├── submit_train_vit.sh               # Job SLURM (nukwa-l40s, 4h límite)
-├── checkpoints/                      # vit_best.pt / vit_last.pt (excluidos de git)
-├── figures/                          # Matriz de confusión, ROC, atención, curvas
-├── results/                          # training_log.csv, evaluation_summary.json, etc.
-├── logs/                             # Logs de los trabajos SLURM
-├── requirements.txt
-└── README.md
+│   ├── preprocessing_worker.py    # Worker paralelo, Datasets y augmentación
+│   └── eda_worker.py
+├── dashboard/                     # Aplicación Streamlit
+│   ├── app.py  theme.py  engine.py  charts.py
+│   └── .streamlit/config.toml
+├── build_dataset_v4.py            # Construcción del conjunto a 256 px
+├── train_hetero.py                # Entrenamiento de ConvNeXt y Swin
+├── train_vit_v5.py                # Entrenamiento del ViT (comparación)
+├── evaluate_ensemble.py           # Ensamble y selección de umbral
+├── benchmark_paralelo.py          # Medición de rendimiento paralelo
+├── generate_stylegan3.py          # Generación y prueba de generalización
+├── diagnose_compression_bias.py   # Hipótesis 1
+├── test_resampling_effect.py      # Hipótesis 2
+├── compare_generators.py          # Hipótesis 3 y análisis espectral
+├── figures/  results/  logs/  report/
+└── requirements.txt
 ```
-
-## Entorno de Cómputo
-
-| Recurso | Detalle |
-|---|---|
-| Plataforma | Kabré Supercomputer — CeNAT |
-| Partición | `nukwa-l40s` |
-| GPU | NVIDIA L40S, 46 GB VRAM |
-| CPUs por trabajo | 16 |
-| RAM por trabajo | 64 GB |
-| CUDA / cuDNN | 12.1 / 9.1 |
-| Límite por trabajo | 4 horas |
-| Cuota de almacenamiento | 20 GB (`/data`, filesystem Lustre) |
 
 ---
 
-*Jason Barrantes Sánchez · sklinderton · LEAD University · 2026*
+## Alcance y limitaciones
+
+El sistema distingue **rostros de StyleGAN3-R frente a fotografías de FFHQ**. No
+es un detector universal de contenido generado por inteligencia artificial: ante
+modelos de difusión como Stable Diffusion o Midjourney, o incluso versiones
+anteriores de StyleGAN, cabe esperar un desempeño sustancialmente menor.
+
+Esa expectativa se apoya en el propio hallazgo del trabajo: si un cambio en el
+parámetro de truncamiento del mismo generador bastó para llevar la detección del
+82 % al 23 %, un cambio de arquitectura generativa producirá un desplazamiento
+mayor.
+
+---
+
+## Licencias
+
+| Componente | Licencia |
+|---|---|
+| PyTorch, torchvision | BSD-3-Clause |
+| StyleGAN3 (NVIDIA) | Uso no comercial |
+| Polars | MIT |
+| Streamlit | Apache 2.0 |
+| Plotly | MIT |
+| Conjunto de datos (Kaggle) | CC-BY-NC-SA-4.0 |
+
+Trabajo académico sin fin comercial.
